@@ -111,7 +111,7 @@ void Convert::readInFile(ifstream &input, int latency) {
 		}
 	}
 
-	this->alap(2);
+	this->alap(latency);
 
 	cout << "break" << endl;
 }//readInFile
@@ -219,6 +219,7 @@ void Convert::alap(int latency) {
 			}
 		}
 	}
+	listR(latency);
 
 }
 
@@ -235,8 +236,14 @@ void Convert::listR(int latency) {
 	unsigned int lowestAdderNode = 0;
 	unsigned int lowestDivNode = 0;
 	unsigned int lowestLogicNode = 0;
+	unsigned int soonestTime = 100;
 	for (unsigned int j = 0; j < nodes.size(); j++) {
-		nodes[j].slack = 1;
+		if (nodes[j].ALAPtime < soonestTime) {
+			soonestTime = nodes[j].ALAPtime;
+		}
+	}
+	for (unsigned int j = 0; j < nodes.size(); j++) {
+		nodes[j].slack = nodes[j].ALAPtime;
 		nodes[j].scheduledTime = 100;
 	}
 	for (unsigned int i = 1; i <= latency; i++) {
@@ -255,9 +262,9 @@ void Convert::listR(int latency) {
 		if (i == 1) {
 			for (unsigned int j = 0; j < nodes.size(); j++) {
 				if (nodes[j].slack != 0 && nodes[j].slack < 1000) {
-					nodes[j].slack = nodes[j].ALAPtime - i;
+					nodes[j].slack -= 1;
 				}
-				else if (nodes[j].slack == 0) {
+				if (nodes[j].slack == 0) {
 					nodes[j].scheduledTime = i;
 					nodes[j].slack = 1337;
 				}
@@ -277,47 +284,93 @@ void Convert::listR(int latency) {
 				}
 				if (usingAdder == 0 && (nodes[j].operation == "-" || nodes[j].operation == "+")) {
 					if (nodes[j].slack < lowestAdder) {
+						lowestAdder = nodes[j].slack;
 						lowestAdderNode = j;
 					}
 				}
 				else if (usingMult == 0 && nodes[j].cycle == 2) {
 					if (nodes[j].slack < lowestMult) {
+						lowestMult = nodes[j].slack;
 						lowestMultNode = j;
 					}
 				}
 				else if (usingDiv == 0 && nodes[j].cycle == 3) {
 					if (nodes[j].slack < lowestDiv) {
+						lowestDiv = nodes[j].slack;
 						lowestDivNode = j;
 					}
 				}
 				else if (usingLogic == 0 && nodes[j].cycle == 1) {
 					if (nodes[j].slack < lowestLogic) {
+						lowestLogic = nodes[j].slack;
 						lowestLogicNode = j;
 					}
 				}
 			}
+			if (usingAdder == 0) {
+				if (nodes[lowestAdderNode].slack <= (soonestTime - 1)) {
+					usingAdder = 1;
+					nodes[lowestAdderNode].scheduledTime = i;
+					nodes[lowestAdderNode].slack = 1337;
+				}
+				
+
+			}
+			if (usingMult == 0) {
+				if (nodes[lowestMultNode].slack <= (soonestTime - 1)) {
+					usingMult = 2;
+					nodes[lowestMultNode].scheduledTime = i;
+					nodes[lowestMultNode].slack = 1337;
+				}
+			}
+			if (usingDiv == 0) {
+				if (nodes[lowestDivNode].slack <= (soonestTime - 1)) {
+					usingDiv = 3;
+					nodes[lowestDivNode].scheduledTime = i;
+					nodes[lowestDivNode].slack = 1337;
+				}
+			}
+			if (usingLogic == 0) {
+				if (nodes[lowestLogicNode].slack <= (soonestTime - 1)) {
+					usingLogic = 1;
+					nodes[lowestLogicNode].scheduledTime = i;
+					nodes[lowestLogicNode].slack = 1337;
+				}
+			}
+		}
+		else {
 			for (unsigned int j = 0; j < nodes.size(); j++) {
-				if (nodes[j].scheduledTime != 100) {
-					if ((nodes[j].operation == "-" || nodes[j].operation == "+") && usingAdder == 0) {
+				if (nodes[j].slack != 0 && nodes[j].slack < 1000) {
+					nodes[j].slack -= 1;
+				}
+				if (nodes[j].slack == 0) {
+					nodes[j].scheduledTime = i;
+					nodes[j].slack = 1337;
+				}
+				if (nodes[j].scheduledTime != 100 && nodes[j].slack < 1000) {
+					if (nodes[j].operation == "-" || nodes[j].operation == "+") {
 						usingAdder = 1;
-						nodes[j].scheduledTime = i;
 					}
-					else if (nodes[j].cycle == 2 && usingMult == 0) {
+					else if (nodes[j].cycle == 2) {
 						usingMult = 2;
-						nodes[j].scheduledTime = i;
 					}
-					else if (nodes[j].cycle == 3 && usingDiv == 0) {
+					else if (nodes[j].cycle == 3) {
 						usingDiv = 3;
-						nodes[j].scheduledTime = i;
 					}
-					else if (nodes[j].cycle == 1 && usingLogic == 0) {
+					else if (nodes[j].cycle == 1) {
 						usingLogic = 1;
-						nodes[j].scheduledTime = i;
 					}
 				}
 			}
 		}
 		
+	}
+	for (unsigned int j = 0; j < nodes.size(); j++) {
+		cout << "Node " << j << " ALAP timeslot = " << nodes[j].ALAPtime << endl;
+	}
+	cout << endl << endl;
+	for (unsigned int j = 0; j < nodes.size(); j++) {
+		cout << "Node " << j << " final scheduled time occurs at timeslot = " << nodes[j].scheduledTime << endl;
 	}
 }
 string Convert::latency() {
