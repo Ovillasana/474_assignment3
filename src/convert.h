@@ -18,15 +18,11 @@ class Convert {
 private:
 public:
 	Convert();
-	void readInFile(ifstream &input, int latency);
-	void standardTests();
-	string classify(string line);
-	string convertIf(ifstream &input);
-	string convertFor();
-	string latency();
-	string standard();
-	void alap(int latency);
-	
+	bool readInFile(ifstream &input, int latency);
+	bool alap(int latency);
+	void listR(int latency);
+	void printHLSM();
+
 };
 
 #endif
