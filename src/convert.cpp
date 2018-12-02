@@ -99,7 +99,7 @@ bool Convert::alap(int latency) {
 
 								foundCount++;
 								if (visited[p].ALAPtime < latestTime) {
-									latestTime = visited[p].ALAPtime-1;
+									latestTime = visited[p].ALAPtime - 1;
 								}
 								break;
 							}
@@ -127,7 +127,7 @@ bool Convert::alap(int latency) {
 	if (visited.size() != nodes.size()) {
 		return false;
 	}
-	
+
 	for (unsigned int i = 0; i < visited.size(); i++) {
 		for (unsigned int j = 0; j < nodes.size(); j++) {
 			if (visited[i].name.compare(nodes[j].name) == 0) {
@@ -277,6 +277,32 @@ void Convert::listR(int latency) {
 					}
 					else if (nodes[j].cycle == 1) {
 						usingLogic = 1;
+					}
+				}
+			}
+		}
+		for (unsigned int j = 0; j < nodes.size(); j++) {
+			if (nodes[j].precursor.size() == 0) {
+				if (nodes[j].scheduledTime == 100 && nodes[j].slack < 1000) {
+					if ((nodes[j].operation == "-" || nodes[j].operation == "+") && usingAdder == 0) {
+						usingAdder = 1;
+						nodes[j].scheduledTime = i;
+						nodes[j].slack = 1337;
+					}
+					else if (nodes[j].cycle == 2 && usingMult == 0) {
+						usingMult = 2;
+						nodes[j].scheduledTime = i;
+						nodes[j].slack = 1337;
+					}
+					else if (nodes[j].cycle == 3 && usingDiv == 0) {
+						usingDiv = 3;
+						nodes[j].scheduledTime = i;
+						nodes[j].slack = 1337;
+					}
+					else if (nodes[j].cycle == 1 & usingLogic == 0) {
+						usingLogic = 1;
+						nodes[j].scheduledTime = i;
+						nodes[j].slack = 1337;
 					}
 				}
 			}
