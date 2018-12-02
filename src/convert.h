@@ -26,7 +26,8 @@ public:
 	string latency();
 	string standard();
 	void alap(int latency);
-	
+	void listR(int latency);
+
 };
 
 #endif
