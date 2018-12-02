@@ -7,66 +7,15 @@ vector<string> states;
 vector<string> inOutVarsState;
 
 
-string opp(string line) {
-	if (line.find("+") != string::npos) {
-		return "+";
-	}
-	else if (line.find("-") != string::npos) {
-		return "-";
-	}
-	else if (line.find("*") != string::npos) {
-		return "*";
-	}
-	else if (line.find(">>") != string::npos) {
-		return ">>";
-	}
-	else if (line.find("<<") != string::npos) {
-		return "<<";
-	}
-	else if (line.find("==") != string::npos) {
-		return "==";
-	}
-	else if (line.find("?") != string::npos) {
-		return "?";
-	}
-	else if (line.find(">") != string::npos) {
-		return ">";
-	}
-	else if (line.find("<") != string::npos) {
-		return "<";
-	}
-	else if (line.find("/") != string::npos) {
-		return "/";
-	}
-	else if (line.find("%") != string::npos) {
-		return "%";
-	}
-	else {
-		return "err";
-	}
-}
-int cycle(string line) {
-	if (line.find("*") != string::npos) {
-		return 2;
-	}
-	else if ((line.find("/") != string::npos) || (line.find("%") != string::npos)) {
-		return 3;
-	}
-	else if (line.find("err") != string::npos) {
-		return 300;
-	}
-	else {
-		return 1;
-	}
-}
-
+string opp(string line);
+int cycle(string line);
 void convertTypes(string in);
 
 Convert::Convert() {
 
 }
 
-void Convert::readInFile(ifstream &input, int latency) {
+bool Convert::readInFile(ifstream &input, int latency) {
 	int totalLines = 0;
 	int count = 0;
 
@@ -111,66 +60,18 @@ void Convert::readInFile(ifstream &input, int latency) {
 		}
 	}
 
-	this->alap(latency);
-
-	cout << "break" << endl;
+	if (this->alap(latency)) {
+		this->listR(latency);
+		this->printHLSM();
+	}
+	else {
+		cout << "LIST_R is not achivable with given latency." << endl;
+		cout << "Press enter and try again" << endl;
+		return false;
+	}
 }//readInFile
 
-void Convert::standardTests() {
-
-}
-
-string Convert::classify(string line) {
-	string test;
-	return test;
-}
-
-string Convert::convertIf(ifstream &input) {
-
-	for (string inLine; getline(input, inLine); ) {
-		string line = inLine;
-		lines.push_back(line);
-	}
-
-	int state = 0;
-	for (unsigned int i = 0; i <= lines.size(); i++) {
-
-		if (lines[i].compare("") == 0) {
-			//empty line
-		}
-
-		else if ((lines[i].find("input") != string::npos) ||
-			(lines[i].find("output") != string::npos) ||
-			(lines[i].find("variable") != string::npos)) {
-
-			convertTypes(lines[i]);
-		}
-
-		else if (lines[i].find("if") != string::npos) {
-			//find closing bracket
-			int closing = 0;
-			for (unsigned int j = i; j <= lines.size(); j++) {
-				if (lines[j].find("}") != string::npos) {
-					closing = j;
-				}
-
-			}
-		}
-
-
-
-	}
-
-	string test;
-	return test;
-}
-
-string Convert::convertFor() {
-	string test;
-	return test;
-}
-
-void Convert::alap(int latency) {
+bool Convert::alap(int latency) {
 	vector<Node> visited;
 	vector<Node> unvisited = nodes;
 	string visitedNodes = "";
@@ -185,42 +86,59 @@ void Convert::alap(int latency) {
 				j--;
 			}
 			else {
-				int successorNodesCount = unvisited[j].successor.size();
-				int foundCount = 0;
-				//check if all successor nodes have been visited
-				for (unsigned int k = 0; k < unvisited[j].successor.size(); k++) {
-					for (unsigned int p = 0; p < visited.size(); p++) {
-						if ((unvisited[j].successor[k].find(visited[p].name)) != string::npos) {
-							//found = true;
-							foundCount++;
-							break;
+				if (!(visited.size() == 0)) {
+					int successorNodesCount = unvisited[j].successor.size();
+					int foundCount = 0;
+					int latestTime = i;
+
+					//check if all successor nodes have been visited
+					for (unsigned int k = 0; k < unvisited[j].successor.size(); k++) {
+						for (unsigned int p = 0; p < visited.size(); p++) {
+							if ((unvisited[j].successor[k].find(visited[p].name)) != string::npos) {
+								//found = true;
+
+								foundCount++;
+								if (visited[p].ALAPtime < latestTime) {
+									latestTime = visited[p].ALAPtime-1;
+								}
+								break;
+							}
 						}
 					}
-				}
 
-				if (foundCount == successorNodesCount) {
-					unvisited[j].ALAPtime = i + 1 - unvisited[j].cycle;
-					visitedNodes += unvisited[j].name + " ";
-					visited.push_back(unvisited[j]);
-					unvisited.erase(unvisited.begin() + j);
-					j--;
+					if (foundCount == successorNodesCount) {
+						//check the latest successor node 
+						if (unvisited[j].cycle == 1) {
+							unvisited[j].ALAPtime = latestTime;
+						}
+						else {
+							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle + 1;
+						}
+						visitedNodes += unvisited[j].name + " ";
+						visited.push_back(unvisited[j]);
+						unvisited.erase(unvisited.begin() + j);
+						j--;
+					}
 				}
-
 			}
-
 		}
 	}
 
+	if (visited.size() != nodes.size()) {
+		return false;
+	}
+	
 	for (unsigned int i = 0; i < visited.size(); i++) {
 		for (unsigned int j = 0; j < nodes.size(); j++) {
 			if (visited[i].name.compare(nodes[j].name) == 0) {
+				if (visited[i].ALAPtime <= 0) {
+					return false;
+				}
 				nodes[j].ALAPtime = visited[i].ALAPtime;
 				break;
 			}
 		}
 	}
-	listR(latency);
-
 }
 
 void Convert::listR(int latency) {
@@ -313,7 +231,7 @@ void Convert::listR(int latency) {
 					nodes[lowestAdderNode].scheduledTime = i;
 					nodes[lowestAdderNode].slack = 1337;
 				}
-				
+
 
 			}
 			if (usingMult == 0) {
@@ -363,7 +281,7 @@ void Convert::listR(int latency) {
 				}
 			}
 		}
-		
+
 	}
 	for (unsigned int j = 0; j < nodes.size(); j++) {
 		cout << "Node " << j << " ALAP timeslot = " << nodes[j].ALAPtime << endl;
@@ -373,23 +291,14 @@ void Convert::listR(int latency) {
 		cout << "Node " << j << " final scheduled time occurs at timeslot = " << nodes[j].scheduledTime << endl;
 	}
 }
-string Convert::latency() {
 
+void Convert::printHLSM() {
 
-	int state = 1;
-
-	for (unsigned int i = 0; i < nodes.size(); i++) {
-
-	}
-	string test;
-	return test;
 }
 
-string Convert::standard() {
-	string test;
-	return test;
-}
 
+
+//extra functions 
 void convertTypes(string line) {
 	string inString = line;
 	string outString = "";
@@ -569,4 +478,58 @@ void convertTypes(string line) {
 	//}
 
 	else {}
+}
+
+string opp(string line) {
+	if (line.find("+") != string::npos) {
+		return "+";
+	}
+	else if (line.find("-") != string::npos) {
+		return "-";
+	}
+	else if (line.find("*") != string::npos) {
+		return "*";
+	}
+	else if (line.find(">>") != string::npos) {
+		return ">>";
+	}
+	else if (line.find("<<") != string::npos) {
+		return "<<";
+	}
+	else if (line.find("==") != string::npos) {
+		return "==";
+	}
+	else if (line.find("?") != string::npos) {
+		return "?";
+	}
+	else if (line.find(">") != string::npos) {
+		return ">";
+	}
+	else if (line.find("<") != string::npos) {
+		return "<";
+	}
+	else if (line.find("/") != string::npos) {
+		return "/";
+	}
+	else if (line.find("%") != string::npos) {
+		return "%";
+	}
+	else {
+		return "err";
+	}
+}
+
+int cycle(string line) {
+	if (line.find("*") != string::npos) {
+		return 2;
+	}
+	else if ((line.find("/") != string::npos) || (line.find("%") != string::npos)) {
+		return 3;
+	}
+	else if (line.find("err") != string::npos) {
+		return 300;
+	}
+	else {
+		return 1;
+	}
 }
