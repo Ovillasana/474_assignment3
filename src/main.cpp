@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
 
 	if (cFile.is_open() && verilogFile.is_open()) {
 		Convert conv = Convert();
-		conv.readInFile(cFile);
+		conv.readInFile(cFile, latency);
 
 	}
 	else {

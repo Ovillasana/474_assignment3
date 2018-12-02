@@ -18,7 +18,7 @@ class Convert {
 private:
 public:
 	Convert();
-	void readInFile(ifstream &input);
+	void readInFile(ifstream &input, int latency);
 	void standardTests();
 	string classify(string line);
 	string convertIf(ifstream &input);

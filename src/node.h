@@ -29,7 +29,7 @@ public:
 	int scheduledTime;
 	int cycle;
 	vector<string> precursor;
-	vector<string> succesor;
+	vector<string> successor;
 	Node();
 	Node(string line, string operation, string out, string in1, string in2, int slack, int ALAPtime, int scheduledTime, int cycle);
 

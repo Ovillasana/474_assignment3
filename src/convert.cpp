@@ -66,7 +66,7 @@ Convert::Convert() {
 
 }
 
-void Convert::readInFile(ifstream &input) {
+void Convert::readInFile(ifstream &input, int latency) {
 	int totalLines = 0;
 	int count = 0;
 
@@ -106,12 +106,12 @@ void Convert::readInFile(ifstream &input) {
 		for (unsigned int j = i; j < nodes.size(); j++) {
 			if ((nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)){
 			//if ((nodes[i].out.compare(nodes[j].in1) == 0) || (nodes[i].out.compare(nodes[j].in2) == 0)) {
-				nodes[i].succesor.push_back(nodes[j].name);
+				nodes[i].successor.push_back(nodes[j].name);
 			}
 		}
 	}
 
-	this->alap(4);
+	this->alap(2);
 
 	cout << "break" << endl;
 }//readInFile
@@ -171,35 +171,55 @@ string Convert::convertFor() {
 }
 
 void Convert::alap(int latency){
-	//vector<Node> visitedNodes;
+	vector<Node> visited;
+	vector<Node> unvisited = nodes;
 	string visitedNodes = "";
+
 	for (unsigned int i = latency; i > 0; i--){
-		for (unsigned int j = nodes.size()-1; j > 0; j--) {
-			if (nodes[j].succesor.size() == 0) {
-				nodes[j].ALAPtime = i;
-				visitedNodes += nodes[j].name + " ";
-				//visitedNodes.push_back(nodes[j]);
+		for (unsigned int j = 0; j < unvisited.size(); j++) {
+			if (unvisited[j].successor.size() == 0) {
+				unvisited[j].ALAPtime = i+1-unvisited[j].cycle;
+				visitedNodes += unvisited[j].name + " ";
+				visited.push_back(unvisited[j]);
+				unvisited.erase(unvisited.begin() + j);
+				j--;
 			}
 			else {
-				bool found = true;
-
-				for (unsigned int k = 0; k < nodes[j].succesor.size(); k++) {
-					if (!(visitedNodes.find(nodes[j].succesor[k]) != string::npos)) {
-						found = false;
+				int successorNodesCount = unvisited[j].successor.size();
+				int foundCount = 0;
+				//check if all successor nodes have been visited
+				for (unsigned int k = 0; k < unvisited[j].successor.size(); k++) {
+					for (unsigned int p = 0; p < visited.size(); p++) {
+						if ((unvisited[j].successor[k].find(visited[p].name)) != string::npos) {
+							//found = true;
+							foundCount++;
+							break;
+						}
 					}
 				}
-				
-				if (found) {
-					if()
-					nodes[j].ALAPtime = i;
-					visitedNodes += nodes[j].name + " ";
+
+				if (foundCount == successorNodesCount) {
+					unvisited[j].ALAPtime = i+1-unvisited[j].cycle;
+					visitedNodes += unvisited[j].name + " ";
+					visited.push_back(unvisited[j]);
+					unvisited.erase(unvisited.begin() + j);
+					j--;
 				}
-				
+
 			}
 
-		}
-		
+		}		
 	}
+
+	for (unsigned int i = 0; i < visited.size(); i++) {
+		for (unsigned int j = 0; j < nodes.size(); j++) {
+			if (visited[i].name.compare(nodes[j].name) == 0) {
+				nodes[j].ALAPtime = visited[i].ALAPtime;
+				break;
+			 }
+		}
+	}
+
 }
 
 string Convert::latency() {
