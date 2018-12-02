@@ -99,7 +99,12 @@ bool Convert::alap(int latency) {
 
 								foundCount++;
 								if (visited[p].ALAPtime < latestTime) {
-									latestTime = visited[p].ALAPtime - 1;
+									latestTime = visited[p].ALAPtime;
+								}
+								if (unvisited[j].cycle == 1) {
+									if (visited[p].ALAPtime == latestTime) {
+										latestTime = visited[p].ALAPtime - 1;
+									}
 								}
 								break;
 							}
@@ -112,7 +117,7 @@ bool Convert::alap(int latency) {
 							unvisited[j].ALAPtime = latestTime;
 						}
 						else {
-							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle + 1;
+							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
 						}
 						visitedNodes += unvisited[j].name + " ";
 						visited.push_back(unvisited[j]);
