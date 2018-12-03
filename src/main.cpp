@@ -18,12 +18,12 @@ int main(int argc, char* argv[]) {
 
 	if (cFile.is_open() && verilogFile.is_open()) {
 		Convert conv = Convert();
-		if (conv.readInFile(cFile, latency)) {
+		if (conv.readInFile(cFile, verilogFile, latency)) {
 			cin.get();
 			return EXIT_SUCCESS;
 		}
 		else {
-			
+			cin.get();
 			return EXIT_FAILURE;
 
 		}

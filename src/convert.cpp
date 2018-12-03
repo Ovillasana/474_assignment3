@@ -3,26 +3,29 @@
 
 vector<string> lines;
 vector<Node> nodes;
-vector<string> states;
-vector<string> inOutVarsState;
+vector<string> outLines;
+vector<string> inputOutputs;
+vector<string> vars;
 
 
 string opp(string line);
 int cycle(string line);
-void convertTypes(string in);
+string convertTypes(string in);
 
-Convert::Convert() {
+Convert::Convert() {} //default constructor
 
-}
-
-bool Convert::readInFile(ifstream &input, int latency) {
+bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 	int totalLines = 0;
 	int count = 0;
 
 	for (string inLine; getline(input, inLine); totalLines++) {
 		string line = inLine;
+		string outLine = inLine;
 		if (line.compare("") != 0) { // check if its not an empty line
 
+			if ((line.find("input") != string::npos) || (line.find("output") != string::npos) || (line.find("variable") != string::npos)) {
+				outLine = convertTypes(inLine);
+			}
 			if (line.find("=") != string::npos) { // operation line
 				Node node = Node();
 				node.name = "v" + to_string(count);
@@ -38,6 +41,8 @@ bool Convert::readInFile(ifstream &input, int latency) {
 				node.in2 = line; //input 2
 				nodes.push_back(node);
 			}
+
+			lines.push_back(outLine);
 		}
 	}
 
@@ -45,7 +50,6 @@ bool Convert::readInFile(ifstream &input, int latency) {
 	for (unsigned int i = 0; i < nodes.size(); i++) {
 		for (unsigned int j = 0; j < i; j++) {
 			if ((nodes[i].in1.find(nodes[j].out) != string::npos) || (nodes[i].in2.find(nodes[j].out) != string::npos)) {
-				//if ((nodes[i].in1.compare(nodes[j].out) == 0) || (nodes[i].in2.compare(nodes[j].out) == 0)) {
 				nodes[i].precursor.push_back(nodes[j].name);
 			}
 		}
@@ -54,7 +58,6 @@ bool Convert::readInFile(ifstream &input, int latency) {
 	for (unsigned int i = 0; i < nodes.size(); i++) {
 		for (unsigned int j = i; j < nodes.size(); j++) {
 			if ((nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
-				//if ((nodes[i].out.compare(nodes[j].in1) == 0) || (nodes[i].out.compare(nodes[j].in2) == 0)) {
 				nodes[i].successor.push_back(nodes[j].name);
 			}
 		}
@@ -62,7 +65,7 @@ bool Convert::readInFile(ifstream &input, int latency) {
 
 	if (this->alap(latency)) {
 		this->listR(latency);
-		this->printHLSM();
+		this->printHLSM(output, latency);
 	}
 	else {
 		cout << "LIST_R is not achivable with given latency." << endl;
@@ -99,7 +102,12 @@ bool Convert::alap(int latency) {
 
 								foundCount++;
 								if (visited[p].ALAPtime < latestTime) {
-									latestTime = visited[p].ALAPtime-1;
+									latestTime = visited[p].ALAPtime;
+								}
+								if (unvisited[j].cycle == 1) {
+									if (visited[p].ALAPtime == latestTime) {
+										latestTime = visited[p].ALAPtime - 1;
+									}
 								}
 								break;
 							}
@@ -112,7 +120,7 @@ bool Convert::alap(int latency) {
 							unvisited[j].ALAPtime = latestTime;
 						}
 						else {
-							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle + 1;
+							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
 						}
 						visitedNodes += unvisited[j].name + " ";
 						visited.push_back(unvisited[j]);
@@ -292,20 +300,48 @@ void Convert::listR(int latency) {
 	}
 }
 
-void Convert::printHLSM() {
+void Convert::printHLSM(ofstream &output, int latency) {
+	cout << endl << endl << endl;
+
+	string moduleName = "`timescale 1ns / 1ps\nmodule HLSM (Clk, Rst, Start, Done, ";
+	for (unsigned int i = 0; i < inputOutputs.size(); i++) {
+		if (i == inputOutputs.size() - 1) { // erase the last comma
+			moduleName += inputOutputs[i];
+		} 
+		else {
+			moduleName += (inputOutputs[i] + ", ");
+		}
+	}
+	moduleName += ");\n";
+	outLines.push_back(moduleName);
+	cout << moduleName;
+	
+	string inOutReg = "input Clk, Rst, Start;\noutput reg Done;\n";
+	for (unsigned int i = 0; i < vars.size(); i++) {
+		inOutReg += (vars[i] + ";\n");
+	}
+	outLines.push_back(inOutReg);
+	cout << inOutReg;
+
+	double bits = ceil(log2(latency + 2));
+	string stateInit = "reg [" + to_string(bits) + ":0] State, NestState;\n\n";
+	for (unsigned int i = 0; i < bits; i++) {
+
+	}
 
 }
 
 
 
 //extra functions 
-void convertTypes(string line) {
+string convertTypes(string line) {
 	string inString = line;
 	string outString = "";
 
 	if (line.find("variable") != string::npos) {
-		inString.replace(0, 8, "wire");
+		inString.replace(0, 8, "reg");
 	}
+	string temp = "";
 	//1 BIT
 	if ((line.find("Int1") != string::npos) && !(line.find("Int16") != string::npos)) {
 
@@ -314,23 +350,19 @@ void convertTypes(string line) {
 			//truncate up to UInt1
 			string splitterSize = "UInt1 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			//outString += "[Uint1-1:0] "; // no need because these are 1 bit variables
+			temp = inString;
 			outString += inString;
-			inOutVarsState.push_back(outString);
 		}
 		//SIGNED INPUTS
 		else {
 			//truncate up to Int1
 			string splitterSize = "Int1 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			//outString += "[Uint1-1:0] "; // no need because these are 1 bit variables
+			 temp = inString;
+			outString += "signed "; 
 			outString += inString;
-			inOutVarsState.push_back(outString);
-
 		}
 	}
 
@@ -342,12 +374,10 @@ void convertTypes(string line) {
 			//truncate up to UInt2
 			string splitterSize = "UInt2 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			outString += "[1:0] "; // no need because these are 1 bit variables
+			 temp = inString;
+			outString += "[1:0] "; 
 			outString += inString;
-			inOutVarsState.push_back(outString);
-
 		}
 		//SIGNED INPUTS
 		else {
@@ -356,12 +386,9 @@ void convertTypes(string line) {
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			outString += "[1:0] ";
+			 temp = inString;
+			outString += "signed [1:0] ";
 			outString += inString;
-			//look for the variables
-			size_t pos = 0;
-			string token;
-			inOutVarsState.push_back(outString);
 		}
 	}
 
@@ -373,23 +400,20 @@ void convertTypes(string line) {
 			//truncate up to UInt8
 			string splitterSize = "UInt8 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
+			 temp = inString;
 			outString += "[7:0] ";
 			outString += inString;
-			inOutVarsState.push_back(outString);
-
 		}
 		//SIGNED INPUTS
 		else {
 			//truncate up to Int8
 			string splitterSize = "Int8 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			outString += "[7:0] ";
+			 temp = inString;
+			outString += "signed [7:0] ";
 			outString += inString;
-			inOutVarsState.push_back(outString);
 		}
 	}
 
@@ -401,23 +425,20 @@ void convertTypes(string line) {
 			//truncate up to UInt16
 			string splitterSize = "UInt16 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
+			 temp = inString;
 			outString += "[15:0] ";
 			outString += inString;
-			inOutVarsState.push_back(outString);
-
 		}
 		//SIGNED INPUTS
 		else {
 			//truncate up to Int16
 			string splitterSize = "Int16 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			outString += "[15:0] ";
+			 temp = inString;
+			outString += "signed [15:0] ";
 			outString += inString;
-			inOutVarsState.push_back(outString);
 		}
 	}
 
@@ -428,56 +449,58 @@ void convertTypes(string line) {
 			//truncate up to UInt32
 			string splitterSize = "UInt32 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
+			 temp = inString;
 			outString += "[32:0] ";
 			outString += inString;
-			inOutVarsState.push_back(outString);
 		}
 		//SIGNED INPUTS
 		else {
 			//truncate up to Int32
 			string splitterSize = "Int32 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			outString += "[32:0] ";
+			 temp = inString;
+			outString += "signed [32:0] ";
 			outString += inString;
-			inOutVarsState.push_back(outString);
 		}
 	}
 
 	//64 BIT
-	//else if (line.find("Int64") != string::npos) {
+	else if (line.find("Int64") != string::npos) {
 
-	//	// UNSIGNED INPUT
-	//	if (line.find("UInt64") != string::npos) {
-	//		//truncate up to UInt64
-	//		string splitterSize = "UInt64 ";
-	//		outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-	//		string temp = outString;
-	//		inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-	//		outString += "[63:0] ";
-	//		outString += inString;
-	//		//look for the variables
-	//		size_t pos = 0;
-	//		string token;
-	//		inOutVarsState.push_back(outString);
-	//	}
-	//	//SIGNED INPUTS
-	//	else {
-	//		//truncate up to Int64
-	//		string splitterSize = "Int64 ";
-	//		outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
-	//		string temp = outString;
-	//		inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-	//		outString += "[63:0] ";
-	//		outString += inString;
-	//		inOutVarsState.push_back(outString);
-	//	}
-	//}
+		// UNSIGNED INPUT
+		if (line.find("UInt64") != string::npos) {
+			//truncate up to UInt64
+			string splitterSize = "UInt64 ";
+			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
+			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
+			 temp = inString;
+			outString += "[63:0] ";
+			outString += inString;
+		}
+		//SIGNED INPUTS
+		else {
+			//truncate up to Int64
+			string splitterSize = "Int64 ";
+			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
+			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
+			 temp = inString;
+			outString += "signed [63:0] ";
+			outString += inString;
+		}
+	}
 
 	else {}
+
+	if (outString.find("output") != string::npos) {
+		outString.replace(0, 6, "output reg");
+	}
+	if (!(outString.find("reg") != string::npos)) {
+		inputOutputs.push_back(temp);
+	}
+	vars.push_back(outString);
+	return outString;
 }
 
 string opp(string line) {
