@@ -6,7 +6,9 @@ vector<Node> nodes;
 vector<string> outLines;
 vector<string> inputOutputs;
 vector<string> vars;
-
+vector<string> inputs;
+vector<string> outputs;
+vector<string> regs;
 
 string opp(string line);
 int cycle(string line);
@@ -92,7 +94,7 @@ bool Convert::alap(int latency) {
 				if (!(visited.size() == 0)) {
 					int successorNodesCount = unvisited[j].successor.size();
 					int foundCount = 0;
-					int latestTime = i;
+					int latestTime = latency;
 
 					//check if all successor nodes have been visited
 					for (unsigned int k = 0; k < unvisited[j].successor.size(); k++) {
@@ -104,11 +106,6 @@ bool Convert::alap(int latency) {
 								if (visited[p].ALAPtime < latestTime) {
 									latestTime = visited[p].ALAPtime;
 								}
-								if (unvisited[j].cycle == 1) {
-									if (visited[p].ALAPtime == latestTime) {
-										latestTime = visited[p].ALAPtime - 1;
-									}
-								}
 								break;
 							}
 						}
@@ -116,11 +113,16 @@ bool Convert::alap(int latency) {
 
 					if (foundCount == successorNodesCount) {
 						//check the latest successor node 
-						if (unvisited[j].cycle == 1) {
-							unvisited[j].ALAPtime = latestTime;
+						if (unvisited[j].cycle > 1) {
+							if (i == latestTime) {
+								unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
+							}
+							else {
+								unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
+							}
 						}
-						else {
-							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
+						else{
+								unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
 						}
 						visitedNodes += unvisited[j].name + " ";
 						visited.push_back(unvisited[j]);
@@ -314,21 +316,78 @@ void Convert::printHLSM(ofstream &output, int latency) {
 	}
 	moduleName += ");\n";
 	outLines.push_back(moduleName);
-	cout << moduleName;
 	
 	string inOutReg = "input Clk, Rst, Start;\noutput reg Done;\n";
 	for (unsigned int i = 0; i < vars.size(); i++) {
 		inOutReg += (vars[i] + ";\n");
 	}
 	outLines.push_back(inOutReg);
-	cout << inOutReg;
 
-	double bits = ceil(log2(latency + 2));
+	int bits = ceil(log2(latency + 2)); // to fixed
+
 	string stateInit = "reg [" + to_string(bits) + ":0] State, NestState;\n\n";
-	for (unsigned int i = 0; i < bits; i++) {
+	stateInit += "parameter sWait = 0, sFinal = 1;\nparameter";
+	for (unsigned int i = 0; i <= latency; i++) {
+		if (i == latency) {
+			stateInit += " S" + to_string(i + 1) + " = " + to_string(i + 2);
+		}
+		else {
+			stateInit += " S" + to_string(i + 1) + " = " + to_string(i + 2) + ",";
+		}
+	}
+	stateInit += ";\n\n";
+	outLines.push_back(stateInit);
 
+	string block = "always@(State, Start, ";
+	for (unsigned int i = 0; i < inputs.size(); i++) {
+		if (i == inputs.size() - 1) {
+			block += inputs[i] + ")begin\n";
+		}
+		else {
+			block += inputs[i] + ", ";
+		}
+	}
+	outLines.push_back(block);
+
+	string state = "case (State)\n\n";
+
+	state += "sWait: begin\nDone = 0;\n";
+	/*for (unsigned int i = 0; i < outputs.size(); i++) {
+		state += outputs[i] + " = 0;\n";
+	}*/
+	for (unsigned int i = 0; i < regs.size(); i++) {
+		state += regs[i] + " = 0;\n";
+	}
+	state += "if (Start == 1)\nNextState <= S1;\nelse\nNextState <= sWait;\nend\n\n";
+	outLines.push_back(state);
+
+	int temp = bits;
+
+	for (unsigned int i = 0; i < latency; i++) {
+		string newState = "S" + to_string(i+1) + ": begin\n";
+		for (unsigned int j = 0; j < nodes.size(); j++) {
+			if (nodes[j].scheduledTime == i+1) {
+				newState += nodes[j].line + ";\n";
+			}
+		}
+		if (i == latency - 1) {
+			newState += "NextState <= sFinal;\nend\n\n";
+		}
+		else {
+			newState += "NextState <= S" + to_string(i + 2) + ";\nend\n\n";
+		}
+		outLines.push_back(newState);
 	}
 
+	string fin = "sFinal: begin\nDone = 1;\nNextState <= sWait;\nend\n\n";
+	outLines.push_back(fin);
+	string enddd = "endCase\nend\n\nalways@(posedge Clk)begin\nif (Rst == 1)\nState <= sWait;\nelse\nState <= NextState;\nend\n\nendmodule";
+	outLines.push_back(enddd);
+
+	for (unsigned int i = 0; i < outLines.size(); i++) {
+		output << outLines[i];
+		cout << outLines[i];
+	}
 }
 
 
@@ -499,6 +558,16 @@ string convertTypes(string line) {
 	if (!(outString.find("reg") != string::npos)) {
 		inputOutputs.push_back(temp);
 	}
+	if (outString.find("input") != string::npos) {
+		inputs.push_back(temp);
+	}
+	if (outString.find("output") != string::npos) {
+		outputs.push_back(temp);
+	}
+	if (outString.find("reg") != string::npos) {
+		outputs.push_back(temp);
+	}
+
 	vars.push_back(outString);
 	return outString;
 }
