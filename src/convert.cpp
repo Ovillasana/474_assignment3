@@ -293,13 +293,13 @@ void Convert::listR(int latency) {
 		}
 
 	}
-	for (unsigned int j = 0; j < nodes.size(); j++) {
+	/*for (unsigned int j = 0; j < nodes.size(); j++) {
 		cout << "Node " << j << " ALAP timeslot = " << nodes[j].ALAPtime << endl;
 	}
 	cout << endl << endl;
 	for (unsigned int j = 0; j < nodes.size(); j++) {
 		cout << "Node " << j << " final scheduled time occurs at timeslot = " << nodes[j].scheduledTime << endl;
-	}
+	}*/
 }
 
 void Convert::printHLSM(ofstream &output, int latency) {
@@ -314,6 +314,7 @@ void Convert::printHLSM(ofstream &output, int latency) {
 			moduleName += (inputOutputs[i] + ", ");
 		}
 	}
+
 	moduleName += ");\n";
 	outLines.push_back(moduleName);
 	
@@ -325,7 +326,7 @@ void Convert::printHLSM(ofstream &output, int latency) {
 
 	int bits = ceil(log2(latency + 2)); // to fixed
 
-	string stateInit = "reg [" + to_string(bits) + ":0] State, NestState;\n\n";
+	string stateInit = "reg [" + to_string(bits) + ":0] State, NextState;\n\n";
 	stateInit += "parameter sWait = 0, sFinal = 1;\nparameter";
 	for (unsigned int i = 0; i <= latency; i++) {
 		if (i == latency) {
@@ -356,7 +357,20 @@ void Convert::printHLSM(ofstream &output, int latency) {
 		state += outputs[i] + " = 0;\n";
 	}*/
 	for (unsigned int i = 0; i < regs.size(); i++) {
-		state += regs[i] + " = 0;\n";
+		if (regs[i].find(",") != string::npos) {
+			string line = regs[i];
+			size_t pos = 0;
+			string token;
+			while (((pos = line.find(",")) != string::npos)) {
+				token = line.substr(0, pos);
+				state += token + " = 0;\n";
+				line.erase(0, pos + 2);
+			}
+			state += line + " = 0;\n";
+		}
+		else {
+			state += regs[i] + " = 0;\n";
+		}
 	}
 	state += "if (Start == 1)\nNextState <= S1;\nelse\nNextState <= sWait;\nend\n\n";
 	outLines.push_back(state);
@@ -381,12 +395,30 @@ void Convert::printHLSM(ofstream &output, int latency) {
 
 	string fin = "sFinal: begin\nDone = 1;\nNextState <= sWait;\nend\n\n";
 	outLines.push_back(fin);
-	string enddd = "endCase\nend\n\nalways@(posedge Clk)begin\nif (Rst == 1)\nState <= sWait;\nelse\nState <= NextState;\nend\n\nendmodule";
+
+	string enddd = "endcase\nend\n\nalways@(posedge Clk)begin\nif (Rst == 1) begin\nDone = 0;\n";
+		for (unsigned int i = 0; i < regs.size(); i++) {
+			if (regs[i].find(",") != string::npos) {
+				string line = regs[i];
+				size_t pos = 0;
+				string token;
+				while (((pos = line.find(",")) != string::npos)) {
+					token = line.substr(0, pos);
+					enddd += token + "= 0;\n";
+					line.erase(0, pos + 2);
+				}
+				enddd += line + " = 0;\n";
+			}
+			else {
+				enddd += regs[i] + " = 0;\n";
+			}
+		}
+
+	enddd += "State <= sWait;\nend\nelse\nState <= NextState;\nend\n\nendmodule";
 	outLines.push_back(enddd);
 
 	for (unsigned int i = 0; i < outLines.size(); i++) {
 		output << outLines[i];
-		cout << outLines[i];
 	}
 }
 
@@ -552,9 +584,7 @@ string convertTypes(string line) {
 
 	else {}
 
-	if (outString.find("output") != string::npos) {
-		outString.replace(0, 6, "output reg");
-	}
+	
 	if (!(outString.find("reg") != string::npos)) {
 		inputOutputs.push_back(temp);
 	}
@@ -564,9 +594,13 @@ string convertTypes(string line) {
 	if (outString.find("output") != string::npos) {
 		outputs.push_back(temp);
 	}
-	if (outString.find("reg") != string::npos) {
-		outputs.push_back(temp);
+	if (outString.find("output") != string::npos) {
+		outString.replace(0, 6, "output reg");
 	}
+	if (outString.find("reg") != string::npos) {
+		regs.push_back(temp);
+	}
+	
 
 	vars.push_back(outString);
 	return outString;
