@@ -3,7 +3,7 @@
 Node::Node() {
 
 }
-Node::Node(string line, string operation, string out, string in1, string in2, int slack, int ALAPtime, int scheduledTime, int cycle) {
+Node::Node(string line, string operation, string out, string in1, string in2, int slack, int ALAPtime, int scheduledTime, int cycle, int ifBlock) {
 	this->line = line;
 	this->operation = operation;
 	this->out = out;
@@ -13,4 +13,5 @@ Node::Node(string line, string operation, string out, string in1, string in2, in
 	this->ALAPtime = ALAPtime;
 	this->scheduledTime = scheduledTime;
 	this->cycle = cycle;
+	this->ifBlock = ifBlock;
 }

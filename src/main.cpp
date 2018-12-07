@@ -18,14 +18,13 @@ int main(int argc, char* argv[]) {
 
 	if (cFile.is_open() && verilogFile.is_open()) {
 		Convert conv = Convert();
-		if (conv.readInFile(cFile, latency)) {
-			cin.get();
+		if (conv.readInFile(cFile, verilogFile, latency)) {
+			cout << "SUCCESS" << endl;
 			return EXIT_SUCCESS;
 		}
 		else {
 
 			return EXIT_FAILURE;
-
 		}
 
 	}

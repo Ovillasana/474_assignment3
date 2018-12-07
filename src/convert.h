@@ -18,10 +18,10 @@ class Convert {
 private:
 public:
 	Convert();
-	bool readInFile(ifstream &input, int latency);
+	bool readInFile(ifstream &input, ofstream &output, int latency);
 	bool alap(int latency);
 	void listR(int latency);
-	void printHLSM();
+	void printHLSM(ofstream &output, int latency);
 
 };
 
