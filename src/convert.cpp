@@ -48,6 +48,18 @@ bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 		}
 	}
 
+	//remove spaces from nodes names
+	for (unsigned int i = 0; i < nodes.size(); i++) {
+		
+		for (unsigned int j = 0; j < nodes[i].in2.length(); j++) {
+			if (nodes[i].in2[j] == ' ') {
+				nodes[i].in2.erase(j, 1);
+				j--;
+			}
+		}
+		
+	}
+
 	//find precursors
 	for (unsigned int i = 0; i < nodes.size(); i++) {
 		for (unsigned int j = 0; j < i; j++) {
@@ -59,7 +71,8 @@ bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 	//find successors
 	for (unsigned int i = 0; i < nodes.size(); i++) {
 		for (unsigned int j = i; j < nodes.size(); j++) {
-			if ((nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+			if ((nodes[j].in1.compare(nodes[i].out) == 0) || (nodes[j].in2.compare(nodes[i].out) == 0)){
+				//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
 				nodes[i].successor.push_back(nodes[j].name);
 			}
 		}
