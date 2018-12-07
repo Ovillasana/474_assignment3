@@ -22,6 +22,9 @@ public:
 	bool alap(int latency);
 	void listR(int latency);
 	void printHLSM(ofstream &output, int latency);
+	bool readInputFile(ifstream &input, ofstream &output);	//reads the input file
+	void checkInitializationVars(string inputLine);
+	bool variableExists(string inputLine);
 
 };
 

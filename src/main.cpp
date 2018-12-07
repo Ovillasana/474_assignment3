@@ -18,12 +18,25 @@ int main(int argc, char* argv[]) {
 
 	if (cFile.is_open() && verilogFile.is_open()) {
 		Convert conv = Convert();
+		if (cFile.peek() == std::ifstream::traits_type::eof()) {
+			cout << "Your input file is empty" << endl;
+			return 0;
+		}
+		if (conv.readInputFile(cFile, verilogFile) == false) {
+			cout << "Error in your input file." << endl;
+			cFile.close();
+			return 0;
+		}
+		cFile.close();
+		cFile.open(argv[1]);
+
 		if (conv.readInFile(cFile, verilogFile, latency)) {
 			cout << "SUCCESS" << endl;
 			return EXIT_SUCCESS;
 		}
 		else {
-			
+			cFile.close();
+			verilogFile.close();
 			return EXIT_FAILURE;
 		}
 

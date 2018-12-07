@@ -3,18 +3,247 @@
 
 vector<string> lines;
 vector<Node> nodes;
+vector<Node> ifAlapNodes;
+vector<Node> elseAlapNodes;
 vector<string> outLines;
 vector<string> inputOutputs;
 vector<string> vars;
 vector<string> inputs;
 vector<string> outputs;
 vector<string> regs;
+string ifVar = "";
+bool inIf = false;
+bool inElse = false;
+bool hadIfNoElse = false;
 
 string opp(string line);
 int cycle(string line);
 string convertTypes(string in);
 
 Convert::Convert() {} //default constructor
+
+vector <string> allVars;
+vector <string> allowedOperations{ "=", "==", "+", "-", ">", ">>", "<", "<<", "?", ":", "*", "/", "%" };
+bool error = false;
+bool Convert::readInputFile(ifstream &input, ofstream &output) {
+	for (string line; getline(input, line); ) {
+		//replace spaces in line with | to make things easier for parsing
+		while (line[0] == '	' || line[0] == ' ') {
+			line = line.substr(1, line.size());
+		}
+		replace(line.begin(), line.end(), ' ', '|');
+		//If input lines have extra spaces on the end, remove them
+		while (line.find("||") != string::npos) {
+			line.erase(line.length() - 2, 2);
+		}
+		//if line contains the word input, output, or wire, call output function to add the variables to the array of all variable names for error checking
+		if ((line.find("input") != string::npos && line.find("|") == 5) || (line.find("output") != string::npos && line.find("|") == 6) || (line.find("wire") != string::npos && line.find("|") == 4) || (line.find("register") != string::npos && line.find("|") == 8) || (line.find("variable") != string::npos && line.find("|") == 8)) {
+			checkInitializationVars(line);
+		}
+		else if (line.length() == 0) {
+
+		}
+		else {
+			if (line.find("if|(") != string::npos || line.find("else|{") != string::npos || line.find("}") != string::npos) {
+				
+			}
+			else {
+				variableExists(line);
+			}
+		}
+		if (error == true) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void Convert::checkInitializationVars(string inputLine) {
+	//Create array with all defined variables for error checking
+	if (inputLine.find("input") != string::npos || inputLine.find("output") != string::npos || inputLine.find("wire") != string::npos || inputLine.find("register") != string::npos || inputLine.find("variable") != string::npos) {
+		string tempString = inputLine.substr(inputLine.find("|"));
+		tempString.erase(0, 1);
+		tempString = tempString.substr(tempString.find("|"));
+		tempString.erase(0, 1);
+		while (tempString.length() != 0) {
+			if (tempString.find(",") != string::npos) {
+				allVars.push_back(tempString.substr(0, tempString.find(",")));
+				tempString.erase(0, allVars[allVars.size() - 1].length() + 2);
+			}
+			else {
+				allVars.push_back(tempString.substr(0, tempString.find("|")));
+				tempString = "";
+			}
+		}
+	}
+}
+
+bool Convert::variableExists(string inputLine) {
+	string intialLine = inputLine;
+	string operation = "";
+	int numSpaces = count(inputLine.begin(), inputLine.end(), '|');
+	bool changedSpaces = false;
+	if (inputLine.substr(0, 2) == "//") {
+		return true;
+	}
+	if (inputLine.find("||") != string::npos) {
+		numSpaces = numSpaces - 2;
+		changedSpaces = true;
+	}
+	//Check to make sure second char in line is equal sign
+	if (inputLine.substr(inputLine.find("|") + 1, 1) != "=") {
+		//cout << "no equal sign" << endl;
+		error = true;
+		return false;
+	}
+	if (numSpaces == 2) {
+		for (int i = 0; i < numSpaces + 1; i++) {
+			if (i == 1) {
+				inputLine.erase(0, inputLine.find("|") + 1);
+			}
+			else if (i == 2) {
+				if (changedSpaces == true) {
+					if (find(allVars.begin(), allVars.end(), inputLine.substr(0, inputLine.find("|"))) != allVars.end()) {
+						//Final var exists
+					}
+					else {
+						//cout << "error, " << inputLine << " doesn't exist" << endl;
+						error = true;
+						return false;
+					}
+				}
+				else {
+					if (find(allVars.begin(), allVars.end(), inputLine.substr(0)) != allVars.end()) {
+						//Final var exists
+					}
+					else {
+						//cout << "error, " << inputLine << " doesn't exist" << endl;
+						error = true;
+						return false;
+					}
+				}
+
+			}
+			else if (find(allVars.begin(), allVars.end(), inputLine.substr(0, inputLine.find("|"))) != allVars.end()) {
+				//Variable exists, no errors
+				inputLine = inputLine.substr(inputLine.find("|"));
+				inputLine.erase(0, 1);
+			}
+			else {
+				//cout << inputLine << "   has a variable that isn't defined prior" << endl;
+				error = true;
+				return false;
+			}
+		}
+	}
+	if (numSpaces == 4) {
+		for (int i = 0; i < numSpaces + 1; i++) {
+			//cout << inputLine << endl;
+			if (i == 1) {
+				inputLine.erase(0, inputLine.find("|") + 1);
+			}
+			else if (i == 3) {
+				if (find(allowedOperations.begin(), allowedOperations.end(), inputLine.substr(0, inputLine.find("|"))) != allowedOperations.end()) {
+					//Operation is valid
+				}
+				else {
+					//Operation is invalid
+					//cout << "operation is invalid   1" << endl;
+					error = true;
+					return false;
+				}
+				inputLine.erase(0, inputLine.find("|") + 1);
+			}
+			else if (i == 4) {
+				if (changedSpaces == true) {
+					if (find(allVars.begin(), allVars.end(), inputLine.substr(0, inputLine.find("|"))) != allVars.end()) {
+						//Final var exists
+					}
+					else {
+						//cout << "error, " << inputLine << " doesn't exist" << endl;
+						error = true;
+						return false;
+					}
+				}
+				else {
+					if (find(allVars.begin(), allVars.end(), inputLine.substr(0)) != allVars.end()) {
+						//Final var exists
+					}
+					else {
+						//cout << "error, " << inputLine << " doesn't exist" << endl;
+						error = true;
+						return false;
+					}
+				}
+
+			}
+			else if (find(allVars.begin(), allVars.end(), inputLine.substr(0, inputLine.find("|"))) != allVars.end()) {
+				//Variable exists, no errors
+				inputLine = inputLine.substr(inputLine.find("|"));
+				inputLine.erase(0, 1);
+			}
+			else {
+				//cout << inputLine << "   has a variable that isn't defined prior" << endl;
+				error = true;
+				return false;
+			}
+		}
+	}
+
+	if (numSpaces == 6) {
+		for (int i = 0; i < numSpaces + 1; i++) {
+			if (i == 1) {
+				inputLine.erase(0, inputLine.find("|") + 1);
+			}
+			else if (i == 3) {
+				if (find(allowedOperations.begin(), allowedOperations.end(), inputLine.substr(0, inputLine.find("|"))) != allowedOperations.end()) {
+					//Operation is valid
+				}
+				else {
+					//Operation is invalid
+					//cout << "operation is invalid" << endl;
+					error = true;
+					return false;
+				}
+				inputLine.erase(0, inputLine.find("|") + 1);
+			}
+			else if (i == 5) {
+				if (find(allowedOperations.begin(), allowedOperations.end(), inputLine.substr(0, inputLine.find("|"))) != allowedOperations.end()) {
+					//Operation is valid
+				}
+				else {
+					//Operation is invalid
+					//cout << "operation is invalid" << endl;
+					error = true;
+					return false;
+				}
+				inputLine.erase(0, inputLine.find("|") + 1);
+			}
+			else if (i == 6) {
+				if (find(allVars.begin(), allVars.end(), inputLine.substr(0)) != allVars.end()) {
+					//Final var exists
+				}
+				else {
+					//cout << "error, " << inputLine << " doesn't exist" << endl;
+					error = true;
+					return false;
+				}
+			}
+			else if (find(allVars.begin(), allVars.end(), inputLine.substr(0, inputLine.find("|"))) != allVars.end()) {
+				//Variable exists, no errors
+				inputLine = inputLine.substr(inputLine.find("|"));
+				inputLine.erase(0, 1);
+			}
+			else {
+				//cout << inputLine << "   has a variable that isn't defined prior" << endl;
+				error = true;
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
 
 bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 	int totalLines = 0;
@@ -24,69 +253,211 @@ bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 		string line = inLine;
 		string outLine = inLine;
 		if (line.compare("") != 0) { // check if its not an empty line
-
-			if ((line.find("input") != string::npos) || (line.find("output") != string::npos) || (line.find("variable") != string::npos)) {
-				outLine = convertTypes(inLine);
+			if (line.find("if (") != string::npos) {
+				ifVar = line.substr(5, line.find(" )") - 5);
+				inIf = true;
 			}
-			if (line.find("=") != string::npos) { // operation line
-				Node node = Node();
-				node.name = "v" + to_string(count);
-				count++;
-				node.line = line;
-				node.out = line.substr(0, line.find(" = ")); // ouput variable
-				line.erase(0, line.find(" = ") + 3);
-				string opperation = opp(line);	//opperation
-				node.operation = opperation;
-				node.cycle = cycle(opperation);
-				node.in1 = line.substr(0, line.find(opperation) - 1); //input 1
-				line.erase(0, line.find(opperation) + opperation.size() + 1);
-				node.in2 = line; //input 2
-				nodes.push_back(node);
+			else if (line.find("}") != string::npos) {
+				inIf = false;
 			}
+			else if (line.find("else {") != string::npos) {
+				inElse = true;
+			}
+			else {
+				if (ifVar != "") {
+					while (line[0] == '	' || line[0] == ' ') {
+						line = line.substr(1, line.size());
+					}
+				}
+				if ((line.find("input") != string::npos) || (line.find("output") != string::npos) || (line.find("variable") != string::npos)) {
+					outLine = convertTypes(inLine);
+				}
+				if (line.find("=") != string::npos) { // operation line
+					Node node = Node();
+					node.name = "v" + to_string(count);
+					count++;
+					node.line = line;
+					node.out = line.substr(0, line.find(" = ")); // ouput variable
+					line.erase(0, line.find(" = ") + 3);
+					string opperation = opp(line);	//opperation
+					node.operation = opperation;
+					node.cycle = cycle(opperation);
+					node.in1 = line.substr(0, line.find(opperation) - 1); //input 1
+					line.erase(0, line.find(opperation) + opperation.size() + 1);
+					node.in2 = line; //input 2
+					if (inIf == true) {
+						node.ifBlock = 1;
+						ifAlapNodes.push_back(node);
+						nodes.push_back(node);
+						hadIfNoElse = true;
+					}
+					else if (inElse == true) {
+						node.ifBlock = 2;
+						elseAlapNodes.push_back(node);
+						hadIfNoElse = false;
+					}
+					else {
+						node.ifBlock = 0;
+						nodes.push_back(node);
+						ifAlapNodes.push_back(node);
+						elseAlapNodes.push_back(node);
+					}
+					
+				}
 
-			lines.push_back(outLine);
+				lines.push_back(outLine);
+			}
+			
 		}
 	}
+	if (inElse == true) {
+		//remove spaces from nodes names
+		for (unsigned int i = 0; i < ifAlapNodes.size(); i++) {
 
-	//remove spaces from nodes names
-	for (unsigned int i = 0; i < nodes.size(); i++) {
-		
-		for (unsigned int j = 0; j < nodes[i].in2.length(); j++) {
-			if (nodes[i].in2[j] == ' ') {
-				nodes[i].in2.erase(j, 1);
-				j--;
+			for (unsigned int j = 0; j < ifAlapNodes[i].in2.length(); j++) {
+				if (ifAlapNodes[i].in2[j] == ' ') {
+					ifAlapNodes[i].in2.erase(j, 1);
+					j--;
+				}
+			}
+
+		}
+
+		//find precursors
+		for (unsigned int i = 0; i < ifAlapNodes.size(); i++) {
+			for (unsigned int j = 0; j < i; j++) {
+				if ((ifAlapNodes[i].in1.find(ifAlapNodes[j].out) != string::npos) || (ifAlapNodes[i].in2.find(ifAlapNodes[j].out) != string::npos)) {
+					ifAlapNodes[i].precursor.push_back(ifAlapNodes[j].name);
+				}
 			}
 		}
-		
-	}
-
-	//find precursors
-	for (unsigned int i = 0; i < nodes.size(); i++) {
-		for (unsigned int j = 0; j < i; j++) {
-			if ((nodes[i].in1.find(nodes[j].out) != string::npos) || (nodes[i].in2.find(nodes[j].out) != string::npos)) {
-				nodes[i].precursor.push_back(nodes[j].name);
+		//find successors
+		for (unsigned int i = 0; i < ifAlapNodes.size(); i++) {
+			for (unsigned int j = i; j < ifAlapNodes.size(); j++) {
+				if (ifAlapNodes[j].operation == "?") {
+					if ((ifAlapNodes[j].in1.find(ifAlapNodes[i].out) != string::npos) || (ifAlapNodes[j].in2.find(ifAlapNodes[i].out) != string::npos)) {
+						ifAlapNodes[i].successor.push_back(ifAlapNodes[j].name);
+					}
+				}
+				else {
+					if ((ifAlapNodes[j].in1.compare(ifAlapNodes[i].out) == 0) || (ifAlapNodes[j].in2.compare(ifAlapNodes[i].out) == 0)) {
+						//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						ifAlapNodes[i].successor.push_back(ifAlapNodes[j].name);
+					}
+				}
 			}
 		}
-	}
-	//find successors
-	for (unsigned int i = 0; i < nodes.size(); i++) {
-		for (unsigned int j = i; j < nodes.size(); j++) {
-			if ((nodes[j].in1.compare(nodes[i].out) == 0) || (nodes[j].in2.compare(nodes[i].out) == 0)){
-				//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
-				nodes[i].successor.push_back(nodes[j].name);
+		//remove spaces from nodes names
+		for (unsigned int i = 0; i < elseAlapNodes.size(); i++) {
+
+			for (unsigned int j = 0; j < elseAlapNodes[i].in2.length(); j++) {
+				if (elseAlapNodes[i].in2[j] == ' ') {
+					elseAlapNodes[i].in2.erase(j, 1);
+					j--;
+				}
+			}
+
+		}
+
+		//find precursors
+		for (unsigned int i = 0; i < elseAlapNodes.size(); i++) {
+			for (unsigned int j = 0; j < i; j++) {
+				if ((elseAlapNodes[i].in1.find(elseAlapNodes[j].out) != string::npos) || (elseAlapNodes[i].in2.find(elseAlapNodes[j].out) != string::npos)) {
+					elseAlapNodes[i].precursor.push_back(elseAlapNodes[j].name);
+				}
 			}
 		}
-	}
-
-	if (this->alap(latency)) {
-		this->listR(latency);
-		this->printHLSM(output, latency);
-	}
-	else {
-		cout << "LIST_R is not achivable with given latency." << endl;
-		cout << "Press enter and try again" << endl;
+		//find successors
+		for (unsigned int i = 0; i < elseAlapNodes.size(); i++) {
+			for (unsigned int j = i; j < elseAlapNodes.size(); j++) {
+				if (elseAlapNodes[j].operation == "?") {
+					if ((elseAlapNodes[j].in1.find(elseAlapNodes[i].out) != string::npos) || (elseAlapNodes[j].in2.find(elseAlapNodes[i].out) != string::npos)) {
+						elseAlapNodes[i].successor.push_back(elseAlapNodes[j].name);
+					}
+				}
+				else {
+					if ((elseAlapNodes[j].in1.compare(elseAlapNodes[i].out) == 0) || (elseAlapNodes[j].in2.compare(elseAlapNodes[i].out) == 0)) {
+						//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						elseAlapNodes[i].successor.push_back(elseAlapNodes[j].name);
+					}
+				}
+			}
+		}
+		nodes = ifAlapNodes;
+		if (this->alap(latency)) {
+			this->listR(latency);
+			ifAlapNodes = nodes;
+			nodes = elseAlapNodes;
+			if (this->alap(latency)) {
+				this->listR(latency);
+				elseAlapNodes = nodes;
+				ifAlapNodes.insert(ifAlapNodes.end(), elseAlapNodes.begin() + 1, elseAlapNodes.end());
+				nodes = ifAlapNodes;
+			}
+			else {
+				cout << "LIST_R is not achivable with given latency." << endl;
+				cout << "Press enter and try again" << endl;
+				return false;
+			}
+			this->printHLSM(output, latency);
+		}
+		else {
+			cout << "LIST_R is not achievable with given latency." << endl;
+			cout << "Press enter and try again" << endl;
+			return false;
+		}
 		return false;
 	}
+	
+	else {
+		//remove spaces from nodes names
+		for (unsigned int i = 0; i < nodes.size(); i++) {
+
+			for (unsigned int j = 0; j < nodes[i].in2.length(); j++) {
+				if (nodes[i].in2[j] == ' ') {
+					nodes[i].in2.erase(j, 1);
+					j--;
+				}
+			}
+
+		}
+
+		//find precursors
+		for (unsigned int i = 0; i < nodes.size(); i++) {
+			for (unsigned int j = 0; j < i; j++) {
+				if ((nodes[i].in1.find(nodes[j].out) != string::npos) || (nodes[i].in2.find(nodes[j].out) != string::npos)) {
+					nodes[i].precursor.push_back(nodes[j].name);
+				}
+			}
+		}
+		//find successors
+		for (unsigned int i = 0; i < nodes.size(); i++) {
+			for (unsigned int j = i; j < nodes.size(); j++) {
+				if (nodes[j].operation == "?") {
+					if ((nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						nodes[i].successor.push_back(nodes[j].name);
+					}
+				}
+				else {
+					if ((nodes[j].in1.compare(nodes[i].out) == 0) || (nodes[j].in2.compare(nodes[i].out) == 0)) {
+						//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						nodes[i].successor.push_back(nodes[j].name);
+					}
+				}
+			}
+		}
+		if (this->alap(latency)) {
+			this->listR(latency);
+			this->printHLSM(output, latency);
+		}
+		else {
+			cout << "LIST_R is not achivable with given latency." << endl;
+			cout << "Press enter and try again" << endl;
+			return false;
+		}
+	}
+	
+
 }//readInFile
 
 bool Convert::alap(int latency) {
@@ -134,8 +505,8 @@ bool Convert::alap(int latency) {
 								unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
 							}
 						}
-						else{
-								unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
+						else {
+							unvisited[j].ALAPtime = latestTime - unvisited[j].cycle;
 						}
 						visitedNodes += unvisited[j].name + " ";
 						visited.push_back(unvisited[j]);
@@ -150,7 +521,7 @@ bool Convert::alap(int latency) {
 	if (visited.size() != nodes.size()) {
 		return false;
 	}
-	
+
 	for (unsigned int i = 0; i < visited.size(); i++) {
 		for (unsigned int j = 0; j < nodes.size(); j++) {
 			if (visited[i].name.compare(nodes[j].name) == 0) {
@@ -307,11 +678,11 @@ void Convert::listR(int latency) {
 
 	}
 	/*for (unsigned int j = 0; j < nodes.size(); j++) {
-		cout << "Node " << j << " ALAP timeslot = " << nodes[j].ALAPtime << endl;
+	cout << "Node " << j << " ALAP timeslot = " << nodes[j].ALAPtime << endl;
 	}
 	cout << endl << endl;
 	for (unsigned int j = 0; j < nodes.size(); j++) {
-		cout << "Node " << j << " final scheduled time occurs at timeslot = " << nodes[j].scheduledTime << endl;
+	cout << "Node " << j << " final scheduled time occurs at timeslot = " << nodes[j].scheduledTime << endl;
 	}*/
 }
 
@@ -322,7 +693,7 @@ void Convert::printHLSM(ofstream &output, int latency) {
 	for (unsigned int i = 0; i < inputOutputs.size(); i++) {
 		if (i == inputOutputs.size() - 1) { // erase the last comma
 			moduleName += inputOutputs[i];
-		} 
+		}
 		else {
 			moduleName += (inputOutputs[i] + ", ");
 		}
@@ -330,7 +701,7 @@ void Convert::printHLSM(ofstream &output, int latency) {
 
 	moduleName += ");\n";
 	outLines.push_back(moduleName);
-	
+
 	string inOutReg = "input Clk, Rst, Start;\noutput reg Done;\n";
 	for (unsigned int i = 0; i < vars.size(); i++) {
 		inOutReg += (vars[i] + ";\n");
@@ -367,7 +738,7 @@ void Convert::printHLSM(ofstream &output, int latency) {
 
 	state += "sWait: begin\nDone = 0;\n";
 	/*for (unsigned int i = 0; i < outputs.size(); i++) {
-		state += outputs[i] + " = 0;\n";
+	state += outputs[i] + " = 0;\n";
 	}*/
 	for (unsigned int i = 0; i < regs.size(); i++) {
 		if (regs[i].find(",") != string::npos) {
@@ -391,12 +762,24 @@ void Convert::printHLSM(ofstream &output, int latency) {
 	int temp = bits;
 
 	for (unsigned int i = 0; i < latency; i++) {
-		string newState = "S" + to_string(i+1) + ": begin\n";
+		string newState = "S" + to_string(i + 1) + ": begin\n";
+		string ifStuff = "";
+		string elseStuff = "";
 		for (unsigned int j = 0; j < nodes.size(); j++) {
-			if (nodes[j].scheduledTime == i+1) {
+			if (nodes[j].ifBlock == 1 && nodes[j].scheduledTime == i + 1) {
+				ifStuff += nodes[j].line + ";\n";
+			}
+			else if (nodes[j].ifBlock == 2 && nodes[j].scheduledTime == i + 1) {
+				elseStuff += nodes[j].line + ";\n";
+			}
+			else if (nodes[j].scheduledTime == i + 1) {
 				newState += nodes[j].line + ";\n";
 			}
 		}
+		if (ifStuff != "" || elseStuff != "") {
+			newState += "if (" + ifVar + ") begin\n" + ifStuff + "end\n" + "else begin\n" + elseStuff + "end\n";
+		}
+		
 		if (i == latency - 1) {
 			newState += "NextState <= sFinal;\nend\n\n";
 		}
@@ -410,22 +793,22 @@ void Convert::printHLSM(ofstream &output, int latency) {
 	outLines.push_back(fin);
 
 	string enddd = "endcase\nend\n\nalways@(posedge Clk)begin\nif (Rst == 1) begin\nDone = 0;\n";
-		for (unsigned int i = 0; i < regs.size(); i++) {
-			if (regs[i].find(",") != string::npos) {
-				string line = regs[i];
-				size_t pos = 0;
-				string token;
-				while (((pos = line.find(",")) != string::npos)) {
-					token = line.substr(0, pos);
-					enddd += token + "= 0;\n";
-					line.erase(0, pos + 2);
-				}
-				enddd += line + " = 0;\n";
+	for (unsigned int i = 0; i < regs.size(); i++) {
+		if (regs[i].find(",") != string::npos) {
+			string line = regs[i];
+			size_t pos = 0;
+			string token;
+			while (((pos = line.find(",")) != string::npos)) {
+				token = line.substr(0, pos);
+				enddd += token + " = 0;\n";
+				line.erase(0, pos + 2);
 			}
-			else {
-				enddd += regs[i] + " = 0;\n";
-			}
+			enddd += line + " = 0;\n";
 		}
+		else {
+			enddd += regs[i] + " = 0;\n";
+		}
+	}
 
 	enddd += "State <= sWait;\nend\nelse\nState <= NextState;\nend\n\nendmodule";
 	outLines.push_back(enddd);
@@ -464,8 +847,8 @@ string convertTypes(string line) {
 			string splitterSize = "Int1 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
-			outString += "signed "; 
+			temp = inString;
+			outString += "signed ";
 			outString += inString;
 		}
 	}
@@ -479,8 +862,8 @@ string convertTypes(string line) {
 			string splitterSize = "UInt2 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
-			outString += "[1:0] "; 
+			temp = inString;
+			outString += "[1:0] ";
 			outString += inString;
 		}
 		//SIGNED INPUTS
@@ -490,7 +873,7 @@ string convertTypes(string line) {
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			string temp = outString;
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "signed [1:0] ";
 			outString += inString;
 		}
@@ -505,7 +888,7 @@ string convertTypes(string line) {
 			string splitterSize = "UInt8 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "[7:0] ";
 			outString += inString;
 		}
@@ -515,7 +898,7 @@ string convertTypes(string line) {
 			string splitterSize = "Int8 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "signed [7:0] ";
 			outString += inString;
 		}
@@ -530,7 +913,7 @@ string convertTypes(string line) {
 			string splitterSize = "UInt16 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "[15:0] ";
 			outString += inString;
 		}
@@ -540,7 +923,7 @@ string convertTypes(string line) {
 			string splitterSize = "Int16 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "signed [15:0] ";
 			outString += inString;
 		}
@@ -554,7 +937,7 @@ string convertTypes(string line) {
 			string splitterSize = "UInt32 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "[32:0] ";
 			outString += inString;
 		}
@@ -564,7 +947,7 @@ string convertTypes(string line) {
 			string splitterSize = "Int32 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "signed [32:0] ";
 			outString += inString;
 		}
@@ -579,7 +962,7 @@ string convertTypes(string line) {
 			string splitterSize = "UInt64 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "[63:0] ";
 			outString += inString;
 		}
@@ -589,7 +972,7 @@ string convertTypes(string line) {
 			string splitterSize = "Int64 ";
 			outString += inString.substr(0, inString.find(splitterSize)); // outstring = "input | output | wire"
 			inString.erase(0, inString.find(splitterSize) + splitterSize.length());
-			 temp = inString;
+			temp = inString;
 			outString += "signed [63:0] ";
 			outString += inString;
 		}
@@ -597,7 +980,7 @@ string convertTypes(string line) {
 
 	else {}
 
-	
+
 	if (!(outString.find("reg") != string::npos)) {
 		inputOutputs.push_back(temp);
 	}
@@ -613,7 +996,7 @@ string convertTypes(string line) {
 	if (outString.find("reg") != string::npos) {
 		regs.push_back(temp);
 	}
-	
+
 
 	vars.push_back(outString);
 	return outString;

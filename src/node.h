@@ -28,10 +28,11 @@ public:
 	int ALAPtime;
 	int scheduledTime;
 	int cycle;
+	int ifBlock;
 	vector<string> precursor;
 	vector<string> successor;
 	Node();
-	Node(string line, string operation, string out, string in1, string in2, int slack, int ALAPtime, int scheduledTime, int cycle);
+	Node(string line, string operation, string out, string in1, string in2, int slack, int ALAPtime, int scheduledTime, int cycle, int ifBlock);
 
 };
 
