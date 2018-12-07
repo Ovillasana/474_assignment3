@@ -3,6 +3,8 @@
 
 vector<string> lines;
 vector<Node> nodes;
+vector<Node> ifAlapNodes;
+vector<Node> elseAlapNodes;
 vector<string> outLines;
 vector<string> inputOutputs;
 vector<string> vars;
@@ -12,6 +14,7 @@ vector<string> regs;
 string ifVar = "";
 bool inIf = false;
 bool inElse = false;
+bool hadIfNoElse = false;
 
 string opp(string line);
 int cycle(string line);
@@ -33,7 +36,6 @@ bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 			}
 			else if (line.find("}") != string::npos) {
 				inIf = false;
-				inElse = false;
 			}
 			else if (line.find("else {") != string::npos) {
 				inElse = true;
@@ -62,14 +64,22 @@ bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 					node.in2 = line; //input 2
 					if (inIf == true) {
 						node.ifBlock = 1;
+						ifAlapNodes.push_back(node);
+						nodes.push_back(node);
+						hadIfNoElse = true;
 					}
 					else if (inElse == true) {
 						node.ifBlock = 2;
+						elseAlapNodes.push_back(node);
+						hadIfNoElse = false;
 					}
 					else {
 						node.ifBlock = 0;
+						nodes.push_back(node);
+						ifAlapNodes.push_back(node);
+						elseAlapNodes.push_back(node);
 					}
-					nodes.push_back(node);
+					
 				}
 
 				lines.push_back(outLine);
@@ -77,52 +87,154 @@ bool Convert::readInFile(ifstream &input, ofstream &output, int latency) {
 			
 		}
 	}
-	//remove spaces from nodes names
-	for (unsigned int i = 0; i < nodes.size(); i++) {
+	if (inElse == true) {
+		//remove spaces from nodes names
+		for (unsigned int i = 0; i < ifAlapNodes.size(); i++) {
 
-		for (unsigned int j = 0; j < nodes[i].in2.length(); j++) {
-			if (nodes[i].in2[j] == ' ') {
-				nodes[i].in2.erase(j, 1);
-				j--;
-			}
-		}
-
-	}
-
-	//find precursors
-	for (unsigned int i = 0; i < nodes.size(); i++) {
-		for (unsigned int j = 0; j < i; j++) {
-			if ((nodes[i].in1.find(nodes[j].out) != string::npos) || (nodes[i].in2.find(nodes[j].out) != string::npos)) {
-				nodes[i].precursor.push_back(nodes[j].name);
-			}
-		}
-	}
-	//find successors
-	for (unsigned int i = 0; i < nodes.size(); i++) {
-		for (unsigned int j = i; j < nodes.size(); j++) {
-			if (nodes[j].operation == "?") {
-				if ((nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
-					nodes[i].successor.push_back(nodes[j].name);
+			for (unsigned int j = 0; j < ifAlapNodes[i].in2.length(); j++) {
+				if (ifAlapNodes[i].in2[j] == ' ') {
+					ifAlapNodes[i].in2.erase(j, 1);
+					j--;
 				}
+			}
+
+		}
+
+		//find precursors
+		for (unsigned int i = 0; i < ifAlapNodes.size(); i++) {
+			for (unsigned int j = 0; j < i; j++) {
+				if ((ifAlapNodes[i].in1.find(ifAlapNodes[j].out) != string::npos) || (ifAlapNodes[i].in2.find(ifAlapNodes[j].out) != string::npos)) {
+					ifAlapNodes[i].precursor.push_back(ifAlapNodes[j].name);
+				}
+			}
+		}
+		//find successors
+		for (unsigned int i = 0; i < ifAlapNodes.size(); i++) {
+			for (unsigned int j = i; j < ifAlapNodes.size(); j++) {
+				if (ifAlapNodes[j].operation == "?") {
+					if ((ifAlapNodes[j].in1.find(ifAlapNodes[i].out) != string::npos) || (ifAlapNodes[j].in2.find(ifAlapNodes[i].out) != string::npos)) {
+						ifAlapNodes[i].successor.push_back(ifAlapNodes[j].name);
+					}
+				}
+				else {
+					if ((ifAlapNodes[j].in1.compare(ifAlapNodes[i].out) == 0) || (ifAlapNodes[j].in2.compare(ifAlapNodes[i].out) == 0)) {
+						//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						ifAlapNodes[i].successor.push_back(ifAlapNodes[j].name);
+					}
+				}
+			}
+		}
+		//remove spaces from nodes names
+		for (unsigned int i = 0; i < elseAlapNodes.size(); i++) {
+
+			for (unsigned int j = 0; j < elseAlapNodes[i].in2.length(); j++) {
+				if (elseAlapNodes[i].in2[j] == ' ') {
+					elseAlapNodes[i].in2.erase(j, 1);
+					j--;
+				}
+			}
+
+		}
+
+		//find precursors
+		for (unsigned int i = 0; i < elseAlapNodes.size(); i++) {
+			for (unsigned int j = 0; j < i; j++) {
+				if ((elseAlapNodes[i].in1.find(elseAlapNodes[j].out) != string::npos) || (elseAlapNodes[i].in2.find(elseAlapNodes[j].out) != string::npos)) {
+					elseAlapNodes[i].precursor.push_back(elseAlapNodes[j].name);
+				}
+			}
+		}
+		//find successors
+		for (unsigned int i = 0; i < elseAlapNodes.size(); i++) {
+			for (unsigned int j = i; j < elseAlapNodes.size(); j++) {
+				if (elseAlapNodes[j].operation == "?") {
+					if ((elseAlapNodes[j].in1.find(elseAlapNodes[i].out) != string::npos) || (elseAlapNodes[j].in2.find(elseAlapNodes[i].out) != string::npos)) {
+						elseAlapNodes[i].successor.push_back(elseAlapNodes[j].name);
+					}
+				}
+				else {
+					if ((elseAlapNodes[j].in1.compare(elseAlapNodes[i].out) == 0) || (elseAlapNodes[j].in2.compare(elseAlapNodes[i].out) == 0)) {
+						//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						elseAlapNodes[i].successor.push_back(elseAlapNodes[j].name);
+					}
+				}
+			}
+		}
+		nodes = ifAlapNodes;
+		if (this->alap(latency)) {
+			this->listR(latency);
+			ifAlapNodes = nodes;
+			nodes = elseAlapNodes;
+			if (this->alap(latency)) {
+				this->listR(latency);
+				elseAlapNodes = nodes;
+				ifAlapNodes.insert(ifAlapNodes.end(), elseAlapNodes.begin() + 1, elseAlapNodes.end());
+				nodes = ifAlapNodes;
 			}
 			else {
-				if ((nodes[j].in1.compare(nodes[i].out) == 0) || (nodes[j].in2.compare(nodes[i].out) == 0)) {
-					//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
-					nodes[i].successor.push_back(nodes[j].name);
+				cout << "LIST_R is not achivable with given latency." << endl;
+				cout << "Press enter and try again" << endl;
+				return false;
+			}
+			this->printHLSM(output, latency);
+		}
+		else {
+			cout << "LIST_R is not achivable with given latency." << endl;
+			cout << "Press enter and try again" << endl;
+			return false;
+		}
+		return false;
+	}
+	
+	else {
+		//remove spaces from nodes names
+		for (unsigned int i = 0; i < nodes.size(); i++) {
+
+			for (unsigned int j = 0; j < nodes[i].in2.length(); j++) {
+				if (nodes[i].in2[j] == ' ') {
+					nodes[i].in2.erase(j, 1);
+					j--;
+				}
+			}
+
+		}
+
+		//find precursors
+		for (unsigned int i = 0; i < nodes.size(); i++) {
+			for (unsigned int j = 0; j < i; j++) {
+				if ((nodes[i].in1.find(nodes[j].out) != string::npos) || (nodes[i].in2.find(nodes[j].out) != string::npos)) {
+					nodes[i].precursor.push_back(nodes[j].name);
 				}
 			}
 		}
+		//find successors
+		for (unsigned int i = 0; i < nodes.size(); i++) {
+			for (unsigned int j = i; j < nodes.size(); j++) {
+				if (nodes[j].operation == "?") {
+					if ((nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						nodes[i].successor.push_back(nodes[j].name);
+					}
+				}
+				else {
+					if ((nodes[j].in1.compare(nodes[i].out) == 0) || (nodes[j].in2.compare(nodes[i].out) == 0)) {
+						//(nodes[j].in1.find(nodes[i].out) != string::npos) || (nodes[j].in2.find(nodes[i].out) != string::npos)) {
+						nodes[i].successor.push_back(nodes[j].name);
+					}
+				}
+			}
+		}
+		if (this->alap(latency)) {
+			this->listR(latency);
+			this->printHLSM(output, latency);
+		}
+		else {
+			cout << "LIST_R is not achivable with given latency." << endl;
+			cout << "Press enter and try again" << endl;
+			return false;
+		}
 	}
+	
 
-	if (this->alap(latency)) {
-		this->listR(latency);
-		this->printHLSM(output, latency);
-	}
-	else {
-		cout << "LIST_R is not achivable with given latency." << endl;
-		cout << "Press enter and try again" << endl;
-		return false;
-	}
 }//readInFile
 
 bool Convert::alap(int latency) {
@@ -429,14 +541,23 @@ void Convert::printHLSM(ofstream &output, int latency) {
 
 	for (unsigned int i = 0; i < latency; i++) {
 		string newState = "S" + to_string(i + 1) + ": begin\n";
+		string ifStuff = "";
+		string elseStuff = "";
 		for (unsigned int j = 0; j < nodes.size(); j++) {
-			
 			if (nodes[j].ifBlock == 1 && nodes[j].scheduledTime == i + 1) {
-				newState += "if (" + ifVar + ") begin\n" + nodes[j].line + ";\nend\n";
-			}else if (nodes[j].scheduledTime == i + 1) {
+				ifStuff += nodes[j].line + ";\n";
+			}
+			else if (nodes[j].ifBlock == 2 && nodes[j].scheduledTime == i + 1) {
+				elseStuff += nodes[j].line + ";\n";
+			}
+			else if (nodes[j].scheduledTime == i + 1) {
 				newState += nodes[j].line + ";\n";
 			}
 		}
+		if (ifStuff != "" || elseStuff != "") {
+			newState += "if (" + ifVar + ") begin\n" + ifStuff + "end\n" + "else begin\n" + elseStuff + "end\n";
+		}
+		
 		if (i == latency - 1) {
 			newState += "NextState <= sFinal;\nend\n\n";
 		}
